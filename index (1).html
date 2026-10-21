@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EDELUXE Précommande</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0E1B2E;--gold:#D9A441;--bg:#F4F6FA;--mut:#4A5568;--line:#E4E9F2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 Inter,sans-serif}
+.wrap{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:40px}
+.hd{background:var(--ink);color:#fff;padding:24px 22px 28px;border-radius:0 0 28px 28px}
+.brand{font:700 18px Sora,sans-serif;letter-spacing:.08em}
+.brand small{color:var(--gold);font-size:10px;letter-spacing:.2em;font-weight:600}
+h1{font:700 26px/1.2 Sora,sans-serif;margin:24px 0 6px}
+.card{background:#fff;border-radius:20px;padding:18px;box-shadow:0 8px 24px rgba(14,27,46,.08);margin:16px 16px 0}
+.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.row span:first-child{color:var(--mut)}.row b{text-align:right}
+.btn{width:100%;height:54px;border:0;border-radius:16px;background:var(--gold);color:var(--ink);font:700 16px Sora,sans-serif;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn2{background:transparent;border:1.5px solid var(--ink)}
+input,select{width:100%;height:50px;border:1.5px solid #C9D3E6;border-radius:14px;padding:0 14px;font:400 16px Inter,sans-serif;background:#fff;color:var(--ink)}
+label{display:block;font:600 13px Inter,sans-serif;margin:14px 0 6px}
+.chip{display:inline-block;background:#EEF2F9;border-radius:99px;padding:5px 11px;font:500 12px Inter,sans-serif}
+.chip.on{background:var(--gold)}
+.note{margin:16px 16px 0;padding:14px;border-radius:16px;background:#E6EEF9;font-size:13px}
+.st{display:flex;gap:8px;margin-top:20px}
+.st div{flex:1;text-align:center;font:500 11px Inter,sans-serif;color:#C9D3E6}
+.st i{display:flex;width:28px;height:28px;margin:0 auto 5px;border-radius:14px;border:1.5px solid #5A6B88;align-items:center;justify-content:center;font:600 13px Inter,sans-serif;font-style:normal}
+.st .d i{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.st .a i{background:#fff;border-color:#fff;color:var(--ink)}
+canvas{width:100%;height:150px;border:2px dashed #8A98B3;border-radius:14px;background:#F9FAFD;touch-action:none;display:block}
+.pad{padding:20px 16px 0}
+.two{display:flex;gap:12px;margin:16px 16px 0}
+.two>div{flex:1;border-radius:20px;padding:16px}
+.err{color:#B42318;text-align:center;margin:10px 0 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyABGcy1V-Js9tcxypAO-c7YhMyWDx41ROA",
+  authDomain: "perfect-services-sgi.firebaseapp.com",
+  projectId: "perfect-services-sgi",
+  messagingSenderId: "942617089118",
+  appId: "1:942617089118:web:a65f5ff973a0ef441690cf"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(), db = firebase.firestore(), TS = () => firebase.firestore.FieldValue.serverTimestamp();
+const ADMIN = 'djiegbochristianhamed@gmail.com';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const F = n => Number(n || 0).toLocaleString('fr-FR') + ' FCFA';
+const ST = {brouillon:'Brouillon',offre_envoyee:'Offre envoyée',signature_en_attente:'Signature en attente',paiement_en_attente:'Paiement en attente',confirmee:'Confirmée',en_transit:'En transit',arrivee_abidjan:'Arrivée à Abidjan',solde_paye:'Solde payé',remise:'Remise au client',annulee:'Annulée',remboursee:'Remboursée'};
+const COND = ['Paiement de l’avance et du solde','Annulation et remboursement','Délais, retards, indisponibilités','Produit différent de la description','Protection des données'];
+const app = h => { $('#app').innerHTML = '<div class="wrap">' + h + '</div>'; };
+const stepper = n => '<div class="st">' + ['Offre','Signature','Avance','Confirmée'].map((l,i) => `<div class="${i+1<n?'d':i+1==n?'a':''}"><i>${i+1}</i>${l}</div>`).join('') + '</div>';
+const head = (t, sub, step) => `<div class="hd"><div class="brand">EDELUXE <small>IMPORT EXPORT</small></div><h1>${t}</h1><p style="margin:0;color:#C9D3E6">${sub || ''}</p>${step ? stepper(step) : ''}</div>`;
+const row = (a, b) => `<div class="row"><span>${a}</span><b>${b}</b></div>`;
+const prices = d => row(`Articles (${d.produit.qte} × ${Number(d.produit.pu).toLocaleString('fr-FR')})`, F(d.produit.qte * d.produit.pu)) + row('Transport international (' + esc(d.mode) + ')', F(d.frais.transport)) + row('Livraison à Abidjan', F(d.frais.livraison)) + row('Frais annexes', F(d.frais.annexes)) + `<div class="row" style="border:0"><span>Total estimatif</span><b style="font:700 22px Sora,sans-serif">${F(d.total)}</b></div>`;
+const when = t => t && t.toDate ? t.toDate().toLocaleString('fr-FR') : '';
+
+/* ===================== CLIENT ===================== */
+let REF, D, signing = false;
+function client(t) {
+  REF = db.collection('precommandes').doc(t);
+  REF.onSnapshot(s => { D = s.exists ? s.data() : null; drawClient(); }, () => app(head('Lien indisponible', 'Contactez EDELUXE.')));
+}
+function drawClient() {
+  const d = D;
+  if (!d || d.statut === 'brouillon') return app(head('Lien indisponible', 'Cette offre n’est pas ou plus disponible.'));
+  const s = d.statut;
+  if (s === 'annulee' || s === 'remboursee') return app(head('Dossier ' + ST[s].toLowerCase(), esc(d.numero)));
+  if (s === 'offre_envoyee' || s === 'signature_en_attente') return signing ? drawSign() : drawOffer();
+  if (s === 'paiement_en_attente') return drawPay();
+  drawDone();
+}
+function drawOffer() {
+  const d = D, p = d.produit;
+  app(head(`Bonjour ${esc((d.client.nom || '').split(' ')[0])},<br>votre proposition est prête`, 'Vérifiez chaque détail, puis signez en 2 minutes.', 1)
+  + `<div class="card">${p.photo ? `<img src="${esc(p.photo)}" alt="" style="width:100%;height:190px;object-fit:cover;border-radius:14px">` : '<div style="height:190px;border-radius:14px;background:#E4E9F2"></div>'}
+  <div style="font:700 19px Sora,sans-serif;margin:14px 0 10px">${esc(p.nom)}</div>
+  <span class="chip">Quantité : ${p.qte}</span> <span class="chip">${esc(d.mode)}</span> <span class="chip">Délai : ${esc(d.delai)}</span></div>
+  <div class="card"><b style="font:700 16px Sora,sans-serif">Détail des prix</b>${prices(d)}</div>
+  <div class="two"><div style="background:#D9A441"><small>Avance à payer</small><div style="font:700 22px Sora,sans-serif">${Number(d.avance).toLocaleString('fr-FR')}</div><small>FCFA · 50 %</small></div>
+  <div style="background:#fff"><small>Solde à l’arrivée</small><div style="font:700 22px Sora,sans-serif">${Number(d.solde).toLocaleString('fr-FR')}</div><small>FCFA · Abidjan</small></div></div>
+  <div class="note"><b>Notre engagement :</b> seul le transport peut varier selon le poids réel (jusqu’à +10 %). S’il coûte moins cher, nous vous rendons la différence.</div>
+  <div class="pad"><button class="btn" id="go">Lire les conditions et signer</button></div>`);
+  $('#go').onclick = () => { signing = true; drawClient(); window.scrollTo(0, 0); };
+}
+function drawSign() {
+  app(head('Conditions et signature', 'Lisez, acceptez, puis signez du doigt.', 2)
+  + `<div class="card"><b style="font:700 16px Sora,sans-serif">Conditions générales (version 1.0)</b>` + COND.map(t => `<details class="row" style="display:block"><summary>${t}</summary><p style="color:var(--mut);margin:8px 0 0">Texte à rédiger et valider lors de la phase « Conditions ».</p></details>`).join('') + `</div>
+  <div class="card"><label style="display:flex;gap:12px;font-weight:500;margin:0"><input id="ok" type="checkbox" style="width:24px;height:24px;flex:none"> J’ai lu et j’accepte les conditions générales de précommande (version 1.0).</label>
+  <label for="nm">Nom complet du signataire</label><input id="nm" placeholder="Nom et prénoms">
+  <label>Votre signature</label><canvas id="cv"></canvas>
+  <button class="btn btn2" id="clr" style="height:40px;margin-top:10px;font-size:14px">Effacer</button></div>
+  <div class="pad"><button class="btn" id="sg">Signer et passer à l’avance</button><p class="err" id="er"></p></div>`);
+  const cv = $('#cv'), r = cv.getBoundingClientRect();
+  cv.width = r.width * 2; cv.height = 300;
+  const x = cv.getContext('2d'); x.scale(2, 2); x.lineWidth = 2.2; x.lineCap = 'round'; x.strokeStyle = '#0E1B2E';
+  let dr = false, any = false;
+  const pt = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  cv.onpointerdown = e => { dr = true; any = true; cv.setPointerCapture(e.pointerId); x.beginPath(); x.moveTo(...pt(e)); };
+  cv.onpointermove = e => { if (dr) { x.lineTo(...pt(e)); x.stroke(); } };
+  cv.onpointerup = () => { dr = false; };
+  $('#clr').onclick = () => { x.clearRect(0, 0, cv.width, cv.height); any = false; };
+  $('#sg').onclick = async () => {
+    const n = $('#nm').value.trim(), er = $('#er');
+    if (!$('#ok').checked) return er.textContent = 'Veuillez accepter les conditions.';
+    if (n.length < 3) return er.textContent = 'Indiquez votre nom complet.';
+    if (!any) return er.textContent = 'Veuillez signer dans le cadre.';
+    $('#sg').disabled = true;
+    try {
+      await REF.update({statut: 'paiement_en_attente', signature: {nom: n, image: cv.toDataURL('image/png'), signeLe: new Date().toISOString(), versionConditions: '1.0'}});
+      signing = false;
+      REF.collection('historique').add({type: 'signature', detail: n, date: TS()}).catch(() => {});
+    } catch (e) { er.textContent = 'Enregistrement impossible. Réessayez.'; $('#sg').disabled = false; }
+  };
+}
+function drawPay() {
+  const d = D;
+  app(head('Payez votre avance', 'Signature enregistrée. Dernière étape avant la confirmation.', 3)
+  + `<div class="card" style="text-align:center"><div style="color:var(--mut)">Montant de l’avance (50 %)</div><div style="font:700 36px Sora,sans-serif;margin:8px 0">${F(d.avance)}</div><button class="btn" id="wv" style="background:#1D6BF3;color:#fff">Payer avec Wave</button></div>
+  <div class="card"><b style="font:700 15px Sora,sans-serif">Paiement en cours de vérification</b><p style="margin:8px 0 0;color:var(--mut)">Dès qu’EDELUXE reçoit votre paiement, votre précommande passe en « Confirmée » et cet écran se met à jour tout seul.</p></div>
+  <div class="note"><b>Sécurité :</b> ne donnez jamais votre code PIN Wave, à personne, pas même à EDELUXE.</div>`);
+  $('#wv').onclick = () => alert('Prototype : le vrai lien de paiement Wave sera branché à la phase 7.');
+}
+function drawDone() {
+  const d = D, ok = d.statut === 'confirmee';
+  app(head(ok ? 'Précommande confirmée' : esc(ST[d.statut]), 'Merci ' + esc((d.client.nom || '').split(' ')[0]) + ', votre dossier ' + esc(d.numero) + ' est suivi ici.', 5)
+  + `<div class="card">${row('Signature enregistrée', esc(d.signature ? new Date(d.signature.signeLe).toLocaleString('fr-FR') : ''))}${row('Avance reçue', F(d.avance))}${row('Référence Wave', esc(d.refWaveAvance || ''))}${row('Statut', esc(ST[d.statut]))}</div>
+  <div class="note"><b>Prochaine étape :</b> le solde de ${F(d.solde)} est à régler à l’arrivée de votre marchandise à Abidjan, ajusté selon le transport réel.</div>
+  <div class="pad"><button class="btn" id="pdf">Télécharger mon PDF</button></div>`);
+  $('#pdf').onclick = () => alert('Prototype : le PDF sera généré à la phase 8.');
+}
+
+/* ===================== ADMIN ===================== */
+let unsub, ALLCOUNT = 0;
+const stop = () => { if (unsub) { unsub(); unsub = null; } };
+function login(m) {
+  stop();
+  app(head('Espace administrateur', 'Connexion EDELUXE') + `<div class="card"><label for="em">E-mail</label><input id="em" type="email" autocomplete="username"><label for="pw">Mot de passe</label><input id="pw" type="password" autocomplete="current-password"><p class="err" id="er">${m || ''}</p><button class="btn" id="go" style="margin-top:12px">Se connecter</button></div>`);
+  $('#go').onclick = () => auth.signInWithEmailAndPassword($('#em').value.trim(), $('#pw').value).catch(e => { $('#er').textContent = 'Connexion refusée (' + e.code + ')'; });
+}
+function dash() {
+  stop();
+  app(head('Précommandes', 'Espace EDELUXE') + `<div class="pad"><button class="btn" id="nw">+ Nouvelle précommande</button></div><div id="ls"></div><div class="pad"><button class="btn btn2" id="lo">Se déconnecter</button></div>`);
+  $('#nw').onclick = () => form(null, null);
+  $('#lo').onclick = () => auth.signOut();
+  unsub = db.collection('precommandes').orderBy('creeLe', 'desc').onSnapshot(s => {
+    if (!$('#ls')) return;
+    ALLCOUNT = s.size;
+    $('#ls').innerHTML = s.docs.map(x => { const d = x.data(); return `<div class="card" data-id="${x.id}" style="cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(d.numero)}</b><span class="chip ${d.statut === 'paiement_en_attente' ? 'on' : ''}">${ST[d.statut]}</span></div><div>${esc(d.client.nom)} · ${F(d.total)}</div></div>`; }).join('') || '<div class="note">Aucune précommande pour le moment.</div>';
+    document.querySelectorAll('[data-id]').forEach(el => el.onclick = () => detail(el.dataset.id));
+  }, e => { $('#ls').innerHTML = '<div class="note">Lecture impossible (' + e.code + ').</div>'; });
+}
+function form(id, d) {
+  stop(); d = d || {client: {}, produit: {}, frais: {}};
+  const f = (l, i, v, t) => `<label for="${i}">${l}</label><input id="${i}" ${t ? 'type="number" inputmode="numeric"' : ''} value="${esc(v ?? '')}">`;
+  app(head(id ? 'Modifier l’offre' : 'Nouvelle précommande', 'Fiche client, produit et frais')
+  + `<div class="card"><b>Client</b>${f('Nom et prénoms', 'nom', d.client.nom)}${f('WhatsApp avec indicatif (ex. 2250700000000)', 'tel', d.client.tel)}${f('Ville / commune', 'ville', d.client.ville)}</div>
+  <div class="card"><b>Produit</b>${f('Nom du produit', 'pn', d.produit.nom)}${f('Lien de la photo (ImgBB)', 'ph', d.produit.photo)}${f('Quantité', 'qt', d.produit.qte, 1)}${f('Prix unitaire (FCFA)', 'pu', d.produit.pu, 1)}
+  <label for="md">Mode d’expédition</label><select id="md"><option>Aérien</option><option>Maritime</option></select>${f('Délai estimé (ex. 15 à 20 jours)', 'dl', d.delai)}</div>
+  <div class="card"><b>Frais</b>${f('Transport international (FCFA)', 'tr', d.frais.transport, 1)}${f('Livraison à Abidjan (FCFA)', 'lv', d.frais.livraison, 1)}${f('Frais annexes (FCFA)', 'an', d.frais.annexes, 1)}<div id="tt" style="margin-top:14px"></div></div>
+  <div class="pad"><button class="btn" id="s1">Enregistrer et obtenir le lien</button><button class="btn btn2" id="s0" style="margin-top:10px">Enregistrer en brouillon</button><button class="btn btn2" id="bk" style="margin-top:10px">Retour</button><p class="err" id="er"></p></div>`);
+  if (d.mode) $('#md').value = d.mode;
+  const v = i => Number($('#' + i).value) || 0;
+  const calc = () => { const t = v('qt') * v('pu') + v('tr') + v('lv') + v('an'), a = Math.round(t / 2); $('#tt').innerHTML = row('Total estimatif', F(t)) + row('Avance (50 %)', F(a)) + row('Solde à l’arrivée', F(t - a)); return [t, a]; };
+  document.querySelectorAll('input').forEach(i => i.oninput = calc); calc();
+  $('#bk').onclick = () => id ? detail(id) : dash();
+  const save = async sent => {
+    const g = i => $('#' + i).value.trim(), er = $('#er');
+    if (g('nom').length < 2 || !/^\d{8,15}$/.test(g('tel')) || g('pn').length < 2 || v('qt') < 1 || v('pu') < 1) return er.textContent = 'Vérifiez : nom, WhatsApp (chiffres seulement), produit, quantité et prix.';
+    const [t, a] = calc();
+    const data = {client: {nom: g('nom'), tel: g('tel'), ville: g('ville')}, produit: {nom: g('pn'), photo: g('ph'), qte: v('qt'), pu: v('pu')}, mode: $('#md').value, delai: g('dl'), frais: {transport: v('tr'), livraison: v('lv'), annexes: v('an')}, total: t, avance: a, solde: t - a, statut: sent ? 'offre_envoyee' : 'brouillon'};
+    try {
+      let key = id;
+      if (!key) {
+        key = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('');
+        data.numero = 'PRE-' + new Date().getFullYear() + '-' + String(ALLCOUNT + 1).padStart(4, '0');
+        data.creeLe = TS();
+      }
+      await db.collection('precommandes').doc(key).set(data, {merge: true});
+      await db.collection('precommandes').doc(key).collection('historique').add({type: id ? 'modification' : 'creation', detail: ST[data.statut], date: TS()});
+      detail(key);
+    } catch (e) { er.textContent = 'Enregistrement impossible (' + e.code + ').'; }
+  };
+  $('#s1').onclick = () => save(true); $('#s0').onclick = () => save(false);
+}
+function detail(id) {
+  stop();
+  const ref = db.collection('precommandes').doc(id);
+  unsub = ref.onSnapshot(async s => {
+    if (!s.exists) return dash();
+    const d = s.data(), h = await ref.collection('historique').orderBy('date', 'desc').get();
+    const url = location.origin + location.pathname + '?p=' + id;
+    const msg = `Bonjour ${d.client.nom}, votre proposition EDELUXE est prête : ${url}`;
+    const editable = d.statut === 'brouillon' || d.statut === 'offre_envoyee';
+    const later = ['confirmee','en_transit','arrivee_abidjan','solde_paye','remise'].includes(d.statut);
+    app(head(esc(d.numero), esc(ST[d.statut]))
+    + `<div class="card">${row('Client', esc(d.client.nom))}${row('WhatsApp', esc(d.client.tel))}${row('Produit', esc(d.produit.nom) + ' × ' + d.produit.qte)}${row('Total estimatif', F(d.total))}${row('Avance (50 %)', F(d.avance))}${row('Solde', F(d.solde))}</div>`
+    + (d.statut !== 'brouillon' ? `<div class="card"><b>Lien privé du client</b><input id="lk" readonly value="${esc(url)}" style="margin:10px 0"><button class="btn" id="cp">Copier le lien</button><a href="https://wa.me/${esc(d.client.tel)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><button class="btn btn2" style="margin-top:10px">Envoyer par WhatsApp</button></a></div>` : '')
+    + `<div class="card"><b>Conditions de confirmation</b>${row('Contrat signé', d.signature ? 'Oui · ' + esc(new Date(d.signature.signeLe).toLocaleString('fr-FR')) : 'Non')}${row('Avance attendue', F(d.avance))}${row('Paiement reçu', d.refWaveAvance ? 'Oui · ' + esc(d.refWaveAvance) : 'Non')}
+    ${d.signature ? `<img src="${d.signature.image}" alt="Signature" style="width:100%;margin-top:10px;border:1px solid var(--line);border-radius:12px">` : ''}
+    ${d.statut === 'paiement_en_attente' ? `<label for="rf">Référence de transaction Wave</label><input id="rf" placeholder="Référence reçue dans Wave"><button class="btn" id="pr" style="margin-top:14px" ${d.signature ? '' : 'disabled'}>Paiement reçu</button>` : ''}</div>`
+    + (later ? `<div class="card"><label for="ns" style="margin-top:0">Changer le statut</label><select id="ns">${['en_transit','arrivee_abidjan','solde_paye','remise','annulee','remboursee'].map(k => `<option value="${k}">${ST[k]}</option>`).join('')}</select><button class="btn" id="cs" style="margin-top:12px">Mettre à jour</button></div>` : '')
+    + `<div class="card"><b>Historique</b>${h.docs.map(x => { const e = x.data(); return row(esc(e.type) + (e.detail ? ' · ' + esc(e.detail) : ''), esc(when(e.date))); }).join('')}</div>
+    <div class="pad">${editable ? '<button class="btn" id="ed" style="margin-bottom:10px">Modifier l’offre</button>' : ''}<button class="btn btn2" id="bk">Retour à la liste</button></div>`);
+    $('#bk').onclick = dash;
+    if ($('#ed')) $('#ed').onclick = () => form(id, d);
+    if ($('#cp')) $('#cp').onclick = () => { $('#lk').select(); navigator.clipboard.writeText(url).then(() => { $('#cp').textContent = 'Lien copié'; }); };
+    if ($('#pr')) $('#pr').onclick = async () => {
+      const r = $('#rf').value.trim();
+      if (r.length < 4) return alert('Saisissez la référence de transaction Wave.');
+      if (!d.signature) return;
+      await ref.update({statut: 'confirmee', refWaveAvance: r, confirmeLe: TS()});
+      await ref.collection('historique').add({type: 'paiement_valide', detail: r, date: TS()});
+    };
+    if ($('#cs')) $('#cs').onclick = async () => {
+      const k = $('#ns').value;
+      await ref.update({statut: k});
+      await ref.collection('historique').add({type: 'statut', detail: ST[k], date: TS()});
+    };
+  });
+}
+
+/* ===================== DÉMARRAGE ===================== */
+const tok = new URLSearchParams(location.search).get('p');
+if (tok) client(tok);
+else auth.onAuthStateChanged(u => {
+  if (!u) return login();
+  if (u.email !== ADMIN) { auth.signOut(); return login('Compte non autorisé.'); }
+  dash();
+});
+</script>
+</body>
+</html>
